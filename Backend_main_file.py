@@ -1,69 +1,73 @@
-from flask import Flask,request
-import json
-from method_call import methodCall
-from flask_cors import CORS, cross_origin
+from flask import Flask, request, make_response, jsonify
+# import json
+from method_call import MainMethods
+# from flask_cors import CORS, cross_origin
+from functools import wraps
+import jwt
+import datetime
 
-method_call = methodCall()
+method_call = MainMethods()
 
 app = Flask(__name__)
-cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
+# cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
+app.config['SECRATE_KEY'] = 'THIS IS SECRATE KEY'
 
-@app.route('/login',methods=['GET'])
-@cross_origin()
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization']
+        if token is None:
+            return jsonify({'message': 'Token is missing !!'}), 401
+
+        try:
+            validation = token.split(" ")
+            data = jwt.decode(validation[1], app.config['SECRET_KEY'])
+            current_user = method_call.user_details_public_id(data['public_id'])
+        except:
+            # print(token)
+            return jsonify({'message': 'Token is invalid !!'}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+@app.route('/login', methods=['GET'])
+# @cross_origin()
 def user_login():
-    user_verify = False
-    try:
-        if request.args.get('username') is not None:
-            new_user = request.args.get('username')
-        else:
-            new_user=None
-        if request.args.get('password') is not None:
-            new_user_pass = request.args.get('password')
-        else:
-            new_user_pass = None
-        # login user logic
-        data = method_call.get_logining(new_user=new_user,new_user_pass=new_user_pass)
-        print("prinintg data",data)
-        return json.dumps({"data": data,"status":'S'})
-    # login user logic
-    except Exception as ex:
-        return json.dumps({"data": ex,"status":'E'})
+    if not request.args.get('username') or not request.args.get('password'):
+        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm ="Login required !!"'})
+    user = method_call.login_verification(request.args.get('username'), request.args.get('password'))
+    print(user)
+
+    if user['status'] is False:
+        print(user)
+        return {'status':False,"message":user['message']}
+    if user['status'] is True:
+        token = jwt.encode({'public_id': user['public_id'], 'exp': datetime.datetime.utcnow() +
+                            datetime.timedelta(minutes=30)},app.config['SECRET_KEY'])
+        return {'token': token.decode('UTF-8')}
 
 
-@app.route('/createAccount',methods=['GET','POST'])
-@cross_origin()
+@app.route('/createAccount', methods=['GET', 'POST'])
+# @cross_origin()
 def newUSer():
+    data = request.args
+    username, email = data.get('name'), data.get('email')
+    password = data.get('password')
+    response = method_call.create_new_user(username, email, password)
     try:
-        if request.args.get('username')!=None:
-            new_user = request.args.get('username')
+        if not response['status']:
+            return "already email exists"
         else:
-            return 'invalid user passes'
-        if request.args.get('password')!=None:
-            new_user_pass = request.args.get('password')
-        else:
-            return "invalid user's password passes"
-        if request.args.get('name')!=None:
-            name = request.args.get('name')
-        else:
-            return "invalid user's name passes"
-        if request.args.get('email_id')!=None:
-            email_id = request.args.get('email_id')
-        else:
-            return "invalid user's email_id passes"
-        data = method_call.create_new_user(new_user=new_user,new_user_pass=new_user_pass,name=name,email_id=email_id)
-        print(data)
-        return json.dumps({
-            'message':data,
-            "status":'S'
-        })
-    except Exception as ex:
-        return json.dumps({
-            'message':ex,
-            "status":'E'
-        })
+            return response
+    except Exception as error:
+        print(error)
 
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port="5001", debug=True)
-
