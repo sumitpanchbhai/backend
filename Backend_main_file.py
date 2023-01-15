@@ -10,7 +10,7 @@ method_call = MainMethods()
 
 app = Flask(__name__)
 # cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
-app.config['SECRATE_KEY'] = 'THIS IS SECRATE KEY'
+app.config['SECRET_KEY'] = 'THIS IS SECRATE KEY'
 
 
 def token_required(f):
@@ -47,9 +47,9 @@ def user_login():
         print(user)
         return {'status':False,"message":user['message']}
     if user['status'] is True:
-        token = jwt.encode({'public_id': user['public_id'], 'exp': datetime.datetime.utcnow() +
-                            datetime.timedelta(minutes=30)},app.config['SECRET_KEY'])
-        return {'token': token.decode('UTF-8')}
+        token = jwt.encode({'public_id': user['public_id'], 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},app.config['SECRET_KEY'])
+        print(token)
+        return {'status': True, 'token': token}
 
 
 @app.route('/createAccount', methods=['GET', 'POST'])
@@ -70,4 +70,4 @@ def newUSer():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port="5001", debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
