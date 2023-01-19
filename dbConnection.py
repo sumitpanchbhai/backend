@@ -32,3 +32,5 @@ class DBConnections():
                                 user=db_data['DB_USERNAME'],
                                 password=db_data['DB_PASSWORD'])
         return conn
+
+

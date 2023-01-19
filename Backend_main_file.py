@@ -1,16 +1,15 @@
 from flask import Flask, request, make_response, jsonify
-# import json
 from method_call import MainMethods
-# from flask_cors import CORS, cross_origin
 from functools import wraps
 import jwt
 import datetime
+from flask_cors import CORS, cross_origin
 
 method_call = MainMethods()
 
 app = Flask(__name__)
-# cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 app.config['SECRET_KEY'] = 'THIS IS SECRATE KEY'
+cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
 def token_required(f):
@@ -36,29 +35,51 @@ def token_required(f):
 
 
 @app.route('/login', methods=['GET'])
-# @cross_origin()
+@cross_origin()
 def user_login():
-    if not request.args.get('username') or not request.args.get('password'):
+    if request.args.get('username') is not None:
+        username = request.args.get('username')
+    else:
+        username = None
+    if request.args.get('password') is not None:
+        password = request.args.get('password')
+    else:
+        password =  None
+    if username is None and password is None:
         return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm ="Login required !!"'})
-    user = method_call.login_verification(request.args.get('username'), request.args.get('password'))
-    print(user)
+    user = method_call.login_verification(username=username, password =password)
 
     if user['status'] is False:
-        print(user)
         return {'status':False,"message":user['message']}
     if user['status'] is True:
         token = jwt.encode({'public_id': user['public_id'], 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},app.config['SECRET_KEY'])
-        print(token)
         return {'status': True, 'token': token}
 
 
 @app.route('/createAccount', methods=['GET', 'POST'])
-# @cross_origin()
+@cross_origin()
 def newUSer():
-    data = request.args
-    username, email = data.get('name'), data.get('email')
-    password = data.get('password')
-    response = method_call.create_new_user(username, email, password)
+    if request.args.get('username') is not None:
+        username = request.args.get('username')
+    else:
+        username = None
+    if request.args.get('email') is not None:
+        email = request.args.get('email')
+    else:
+        email = None
+    if request.args.get('password') is not None:
+        password = request.args.get('password')
+    else:
+        password = None
+    if request.args.get('name') is not None:
+        name = request.args.get('name')
+    else:
+        name = None
+    # data = request.args
+    # username, email = data.get('name'), data.get('email')
+    # password = data.get('password')
+    response = method_call.create_new_user(username=username, email=email, password=password,name=name)
+    print("printing response",response)
     try:
         if not response['status']:
             return "already email exists"
@@ -66,6 +87,20 @@ def newUSer():
             return response
     except Exception as error:
         print(error)
+    return response
+
+@app.route('/validate_user',methods=['GET'])
+def validate_user():
+    try:
+        if request.args.get('username') is not None:
+            username = request.args.get('username')
+        else:
+            username = None
+        validate_user = method_call.validate_user(username=username)
+        return validate_user
+    except Exception as error:
+        return {'status': True, 'message': error}
+
 
 
 

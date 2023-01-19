@@ -3,11 +3,12 @@ from dbConnection import DBConnections
 import bcrypt
 import uuid
 import datetime
-from validate_email_address import validate_email
+import validate_email
 # mail send
 import smtplib
 import ssl
 from email.message import EmailMessage
+from validate_email import validate_email
 
 
 class MainMethods:
@@ -28,7 +29,7 @@ class MainMethods:
                 return {'status': True, 'username': username, 'password': password, 'email': email,
                         'public_id': public_id}
             elif len(data['username']) == 0:
-                return {'status': False, 'message': 'user doesnt exist or enter correct username'}
+                return {'status': False, 'message': 'enter correct username'}
             else:
                 return {'status': False, 'message': "enter correct password"}
         except Exception as error:
@@ -49,12 +50,12 @@ class MainMethods:
         except Exception as error:
             return error
 
-    def create_new_user(self, username=None, password=None, email=None):
+    def create_new_user(self, username=None, password=None, email=None ,name=None):
         conn = None
         cur = None
+
         public_id = uuid.uuid1()
         password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        print(str(password))
         created_on = datetime.datetime.now()
         select_query = f"""select username,password,email,public_id from project_1.user_details 
                         where email = '{email}' """
@@ -65,29 +66,26 @@ class MainMethods:
             conn = self.db.get_db_connection()
             email_list = pd.read_sql(select_query, conn).to_dict(orient='list')['email']
             username_list = pd.read_sql(select_usernames, conn).to_dict(orient='list')['username']
-            print(username_list)
-            print(email_list)
-            print(public_id)
-            print(insert_query)
-
             if len(email_list) == 1:
-                return {'status': False, "message": "email already got registered"}
+                return {'status': True, "message": "email already got registered"}
             elif len(email_list) == 0:
                 count = 0
                 for i in username_list:
                     if i == username:
                         count = count + 1
-                        return {"status": False, "message": "username exists"}
+                        return {"status": True, "message": "username exists"}
                     else:
                         continue
+
 
                 if validate_email(email):
                     cur = conn.cursor()
                     cur.execute(insert_query)
                     conn.commit()
+                    self.sendMail(email_receiver=email) #sending mail to the new user
                     return {'status': True, "message": 'registered succesfully'}
                 else:
-                    return {"status": False, "message": "enter valid mail"}
+                    return {"status": True, "message": "enter valid mail"}
         except Exception as error:
             print(error)
             return error
@@ -97,10 +95,10 @@ class MainMethods:
             if conn is not None:
                 conn.close()
 
-    def sendMail(self, email_sender=None, email_receiver=None):
+    def sendMail(self, email_receiver=None):
         # Define email sender and receiver
-        # email_sender = 'tsumit1998@gmail.com'
-        email_sender = email_sender
+        email_sender = 'tsumit1998@gmail.com'
+        # email_sender = email_sender
         # email_password = 'asdf_445@hajmola'
         email_password = 'jomqqljkblldciay'  # generated password using (https://myaccount.google.com/u/0/apppasswords?pli=1&rapt=AEjHL4NmeBXL9UOfglxEegUP40kYiZyMy7waAswuKoiSAozlSNlMwmOOv3LEu8bg30AVfaeLACOfQ-A08t63ZaL2rQcaDX6IaQ)
         email_receiver = email_receiver
@@ -125,6 +123,22 @@ class MainMethods:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
             smtp.login(email_sender, email_password)
             smtp.sendmail(email_sender, email_receiver, em.as_string())
+
+    def validate_user(self,username=None):
+        conn = None
+        select_query =f'select username from project_1.user_details where username={username}'
+        try:
+            conn = self.db.get_db_connection()
+            data = pd.read_sql_query(select_query,conn).to_dict(orient='list')
+            if len(data)==0:
+                return {'status':False,'message':'user dosent exits'}
+            else:
+                return {'status':True,'message':'user exits'}
+        except Exception as error:
+            return {'status':False,'message':error}
+        finally:
+            if conn is not None:
+                conn.close()
 
 # main = methodCall()
 # print(main.login_verification('fjdsfhuus', 'nsbchjdvs'))
